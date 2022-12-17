@@ -9,18 +9,18 @@ char pass[] = "umin1234";        // your network password
 int status = WL_IDLE_STATUS;     // the Wifi radio's status
 char server[] = "15.164.111.44";
 
-unsigned long lastConnectionTime = 0;         // last time you connected to the server, in milliseconds
+unsigned long lastConnectionTime = 0;           // 할일 조회 호출
 const unsigned long postingInterval = 30000L; // 60초 마다
 
 WiFiEspClient client;
-
-String todo = "";
-String old_todo = "none";
 String user_id = "1";
-String message = "";
-String old_message = "";
 
-//---- Slave ----
+// String todo = "todo";
+// String old_todo = "old_todo";
+// String message = "message";
+// String old_message = "old_todo";
+
+//---- Master ----
 void setup() {
   Wire.begin();
   
@@ -50,52 +50,68 @@ void setup() {
   printWifiStatus();
 }
 void loop() {
-  requestEvent();
-  delay(100);
-}
 
-void requestEvent(){
   // todo List 조회
   while (client.available()) {
     String line = client.readStringUntil('\r');
+    line.replace("\n", "");
     
-    if(line.indexOf(':') != -1){
-      String header = line.substring(line.indexOf('\n') + 1, line.indexOf(':'));
-      if(header.equals("MSG"))
+    if(line.indexOf('#') != -1){
+      int isize = line.length();
+      while(isize > 0)
       {
-        message = line.substring(line.indexOf(':') + 1);
-        Serial.println(message);
+       String now = "";
+        if (isize > 30){
+          now = line.substring(0, 30);
+          line = line.substring(30);
+          Serial.println(isize);
+          isize = line.length();
+        }
+        else{
+          now = line;
+          isize = 0;
+        }
+          
+        Wire.beginTransmission(1);
+        Serial.print(now);
+        Wire.print(now);
+        // Wire.println("#hello");
+        Wire.endTransmission();
+        delay(50);
       }
-    }
-    else if(line.indexOf('#') != -1)
-    {
-      todo = line.substring(line.indexOf('#') + 1, line.length());
-      Serial.print(todo);
-    }
-  }
-  Serial.print(message);
-  Wire.beginTransmission(8);
-  Wire.print(message);
-  Wire.endTransmission();
-  if(message != "" && !message.equals(old_message))
-  {
-    old_message = message;
-  }
-  message = "";   
+      // // Serial.println(line);
+      // if (line.length() > 30)
+      // {
+      //   Serial.print("hey");
+      //   Serial.println(line.length());
 
-  // 변경된 경우에만 조명새로하기
-  if(todo != "" && !todo.equals(old_todo))
-  {
-    old_todo = todo;
+      //   Wire.beginTransmission(1);
+      //   for(int i = 0; i < line.length(); i++){
+      //   Serial.print(line[i]);
+      //   Wire.write(line[i]);
+      //   }
+      //   // Serial.print(line.substring(0, 30));
+      //   // Wire.print(line.substring(0, 30));
+      //   // Wire.endTransmission(1);
+      //   // delay(100);
+      //   // Wire.beginTransmission(1);
+      //   // Serial.println(line.substring(30));
+      //   // Wire.println(line.substring(30));
+      //   Wire.endTransmission(1);
+      // }
+      // else{
+      //   Wire.beginTransmission(1);
+      //   Wire.println(line);
+      //   // Wire.println("#hello");
+      //   Wire.endTransmission();
+      // }
+    }
+    delay(10);
   }
-  todo = "";    //  버퍼 비우기
-  
   delay(100);
 
-  // if 10 seconds have passed since your last connection,
-  // then connect again and send data
+  // postingInterval 마다 데이터 조회
   if (millis() - lastConnectionTime > postingInterval) {
-    // httpRequest("/service/done/" + user_id);
-    httpRequest("/service/message/" + user_id);
+    httpRequest("/service/goals/" + user_id);
   }
 }
