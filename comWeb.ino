@@ -23,6 +23,7 @@ void httpRequest(String url)
   else {
     // if you couldn't make a connection
     Serial.println("Connection failed");
+    delay(1000);
   }
 }
 
