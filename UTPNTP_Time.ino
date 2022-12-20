@@ -27,7 +27,7 @@ void sendNTPpacket(char *ntpSrv)
 
 // NTP 시간 조회
 void requestNTPTime(){
-  sendNTPpacket(timeServer); // send an NTP packet to a time server
+  sendNTPpacket("time.nist.gov"); // send an NTP packet to a time server
   
   // wait for a reply for UDP_TIMEOUT miliseconds
   unsigned long startMs = millis();
@@ -50,7 +50,7 @@ void requestNTPTime(){
 
     //- 시
     int hour = (epoch  % 86400L) / 3600;
-    if(hour >= 0 && hour <= 4)
+    if(hour >= 0 && hour <= 5)
     {
       is0004 = true;    // 새벽 00:00~04:59 여부 업데이트
       Serial.print(hour);

@@ -1,8 +1,8 @@
 #include <Wire.h>
+
 //---- Sensor ----
 const int TRIG = 9;   // 초음파 보내는 핀
 const int ECHO = 10;   // 초음파 받는 핀
-float duration, distance;
 
 //---- Wifi ----
 #include "WiFiEsp.h"
@@ -11,25 +11,22 @@ SoftwareSerial Serial1(6, 7);  //RX, TX
 char ssid[] = "umin";          // your network SSID (name)
 char pass[] = "umin1234";      // your network password
 int status = WL_IDLE_STATUS;   // the Wifi radio's status
-char server[] = "15.164.111.44";
 
 unsigned long lastLightTime = 0;              // 조도센서 조회 호출
-const unsigned long lightInterval = 120000L;  // 2분 마다
+const unsigned long lightInterval = 600000L;  // 10분 마다
 
 unsigned long lastConnectionTime = 0;          // 할일 조회 호출
 const unsigned long postingInterval = 30000L;  // 30초 마다
 
 WiFiEspClient client;
-String user_id = "1";
 bool all_done = false;    // 모든 할일 완료여부
 
 //---- NTP-UDP 요청 ----
 #include "WiFiEspUdp.h"
 
 unsigned long lastNTPRequest = 0;                 // 시간 조회
-const unsigned long NTPRequestInterval = 60000L;  // 60초 마다
+const unsigned long NTPRequestInterval = 60000L; // 60*10초(10분) 마다 : 테스트 환경 - 2분
 bool is0004 = false;                              // 00시 00분 ~ 04시 59분 인지 확인
-char timeServer[] = "time.nist.gov";  // NTP server
 unsigned int localPort = 2390;        // local port to listen for UDP packets
 
 const int NTP_PACKET_SIZE = 48;  // NTP timestamp is in the first 48 bytes of the message
@@ -75,17 +72,20 @@ void setup() {
 
   Serial.println("You're connected to the network");
 
-  printWifiStatus();
+  // printWifiStatus();
   Udp.begin(localPort);
 }
 void loop() {
-  if(all_done){   // 모두 완료한 경우에만 선물박스 작동 가능
-    boxControl();
-  }
-  else{
-    myServo.write(0);
-    myServo.detach();
-  }
+  // if(!client.available())
+  // {
+  //   if(all_done){   // 모두 완료한 경우에만 선물박스 작동 가능
+  //     boxControl();
+  //   }
+  //   else{
+  //     myServo.write(0);
+  //     myServo.detach();
+  //   }
+  // }
 
   // 현재시간 조회
   if (millis() - lastNTPRequest > NTPRequestInterval) {
@@ -118,14 +118,17 @@ void loop() {
   }
 
   // todo List 조회
+  myServo.detach();
   while (client.available()) {
+    all_done = false;
     String line = client.readStringUntil('\r');
     line.replace("\n", "");
+          Serial.println(line);
 
     if (line.indexOf('#') != -1) {  // 웹서비스 요청 Response 받기
       int isize = line.length();
-      checkAllDone(line);           // 할일 모두 완료했는지 체크
       Serial.println("Good Data");
+      checkAllDone(line);           // 할일 모두 완료했는지 체크
 
       // 32byte 이상 데이터 전송 처리 : 오래 걸림 휴
       while (isize > 0) {
@@ -147,18 +150,31 @@ void loop() {
         delay(50);
       }
     }
-    else{
-      Serial.println("Bad Data");
-      Serial.println(line);
-    }
+    // else{
+    //   Serial.println("Bad Data");
+    //   Serial.println(line);
+    // }
   }
+  // if(client.available()){
+  //   all_done = false;
+  // }
   delay(100);
 
+  if(!client.available())
+  {
+    if(all_done){   // 모두 완료한 경우에만 선물박스 작동 가능
+      boxControl();
+    }
+    else{
+      myServo.write(0);
+      myServo.detach();
+    }
+  }
   // postingInterval 마다 데이터 조회
   if (millis() - lastConnectionTime > postingInterval) {
-    // httpRequest("/service/goals/" + user_id);
     httpRequest("/service/goals/connected");
   }
+
 }
 
 // 할일 모두 완료했는지 체크
@@ -179,13 +195,13 @@ void checkAllDone(String res){
 
   if(total_cnt > 0 && total_cnt == done_cnt)   // 등록된 할일이 있고, 모두 완료한 경우
   {
+    Serial.print("all done");
     all_done = true;
   }
   else{
+    Serial.print("no done");
     all_done = false;
   }
-  Serial.print("all done:");
-  Serial.println(all_done);
 }
 
 // 상자 열기
@@ -197,39 +213,38 @@ void boxControl() {
   digitalWrite(TRIG, HIGH);   // 초음파 보내기
   delayMicroseconds(10);
   digitalWrite(TRIG, LOW);  
+  float duration = pulseIn(ECHO, HIGH);       // 초음파 반사되어 돌려받은 시간 저장
+  float distance = duration * 17.0 / 1000.0;  // 거리 계산 (cm 변환)
   
-  duration = pulseIn(ECHO, HIGH);       // 초음파 반사되어 돌려받은 시간 저장
-  distance = duration * 17.0 / 1000.0;  // 거리 계산 (cm 변환)
-
   delay(1000);
   int open = 0;
-  int close = 100;
+  int close = 90;
 
   if (!open_flag && distance < 20) {   // 닫혀있고, 앞에 뭐가 있는 경우에만
-    Serial.print("distance : ");
-    Serial.print(distance);
+  // if (!open_flag) {   // 닫혀있고, 앞에 뭐가 있는 경우에만
+    // Serial.print(distance);
     Serial.println(" (open) ");
     myServo.attach(4);
     open_flag = !open_flag;
     // 90: open,  180: close
     for (int pos = close; pos > open; pos--) {
       myServo.write(pos);
-      delay(15);
+      delay(20);
     }
     myServo.detach();
     // 징글벨 재생
     jinglebell();
     delay(100);
   }
-  else if(open_flag && distance > 50){    // 열려있는데, 앞에 뭐가 없으면 닫기
-    Serial.print("distance : ");
-    Serial.print(distance);
+  else if(open_flag && distance > 30){    // 열려있는데, 앞에 뭐가 없으면 닫기
+  // else if(open_flag){    // 열려있는데, 앞에 뭐가 없으면 닫기
+    // Serial.print(distance);
     Serial.println(" (close) ");
     myServo.attach(4);
     open_flag = !open_flag;
     for (int pos = open; pos < close; pos++) {
       myServo.write(pos);
-      delay(15);
+      delay(20);
     }
     myServo.detach();
 

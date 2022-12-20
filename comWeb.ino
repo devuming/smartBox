@@ -8,7 +8,7 @@ void httpRequest(String url)
   client.stop();
 
   // if there's a successful connection
-  if (client.connect(server, 80)) {
+  if (client.connect("15.164.111.44", 80)) {
     Serial.println("Connecting...");
     
     // send the HTTP PUT request
@@ -25,23 +25,4 @@ void httpRequest(String url)
     Serial.println("Connection failed");
     delay(1000);
   }
-}
-
-// 와이파이 상태 출력
-void printWifiStatus()
-{
-  // print the SSID of the network you're attached to
-  Serial.print("SSID: ");
-  Serial.println(WiFi.SSID());
-
-  // print your WiFi shield's IP address
-  IPAddress ip = WiFi.localIP();
-  Serial.print("IP Address: ");
-  Serial.println(ip);
-
-  // print the received signal strength
-  long rssi = WiFi.RSSI();
-  // Serial.print("Signal strength (RSSI):");
-  // Serial.print(rssi);
-  // Serial.println(" dBm");
 }
